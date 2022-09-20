@@ -19,10 +19,16 @@ export const recordOperations: INodeProperties[] = [
 				action: 'Create a record',
 			},
 			{
-				name: 'Get Many',
+				name: 'Get All',
 				value: 'getAll',
-				description: 'Retrieve many records',
-				action: 'Get many records',
+				description: 'Retrieve all records',
+				action: 'Get all records',
+			},
+			{
+				name: 'Query Job',
+				value: 'query',
+				description: 'Get Query Results',
+				action: 'Get Query Result records',
 			},
 		],
 		default: 'create',
@@ -43,7 +49,7 @@ export const recordFields: INodeProperties[] = [
 		required: true,
 		displayOptions: {
 			show: {
-				operation: ['create'],
+				operation: ['create', ''],
 				resource: ['record'],
 			},
 		},
@@ -163,7 +169,7 @@ export const recordFields: INodeProperties[] = [
 		required: true,
 		displayOptions: {
 			show: {
-				operation: ['getAll'],
+				operation: ['getAll', 'query'],
 				resource: ['record'],
 			},
 		},
@@ -182,7 +188,7 @@ export const recordFields: INodeProperties[] = [
 		required: true,
 		displayOptions: {
 			show: {
-				operation: ['getAll'],
+				operation: ['getAll', 'query'],
 				resource: ['record'],
 			},
 		},
@@ -201,13 +207,29 @@ export const recordFields: INodeProperties[] = [
 		required: true,
 		displayOptions: {
 			show: {
-				operation: ['getAll'],
+				operation: ['getAll', 'query'],
 				resource: ['record'],
 			},
 		},
 		default: '',
 		description:
 			'ID of the table to retrieve all rows from. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>.',
+	},
+	{
+		displayName: 'Query',
+		name: 'query',
+		type: 'string',
+		typeOptions: {
+			rows: 15
+		},
+		displayOptions: {
+			show: {
+				operation: ['query']
+			},
+		},
+		required: true,
+		default: "SELECT * FROM `datasetName.tableName` LIMIT 100",
+		description: 'Write your query in this field',
 	},
 	{
 		displayName: 'Return All',
@@ -247,7 +269,7 @@ export const recordFields: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['record'],
-				operation: ['getAll'],
+				operation: ['getAll', 'query'],
 			},
 		},
 		default: true,
@@ -273,6 +295,35 @@ export const recordFields: INodeProperties[] = [
 				default: '',
 				description:
 					'Subset of fields to return, supports select into sub fields. Example: <code>selectedFields = "a,e.d.f"</code>',
+			}
+			// {
+			// 	displayName: 'Use Int64 Timestamp',
+			// 	name: 'useInt64Timestamp',
+			// 	type: 'boolean',
+			// 	default: false,
+			// 	description: 'Output timestamp as usec int64.',
+			// },
+		],
+	},
+	{
+		displayName: 'Options',
+		name: 'options',
+		type: 'collection',
+		placeholder: 'Add Options',
+		default: {},
+		displayOptions: {
+			show: {
+				operation: ['query'],
+				resource: ['record'],
+			},
+		},
+		options: [
+			{
+				displayName: 'Location',
+				name: 'location',
+				type: 'string',
+				default: "EU",
+				description: 'Define your location',
 			},
 			// {
 			// 	displayName: 'Use Int64 Timestamp',

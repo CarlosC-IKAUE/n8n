@@ -15,6 +15,7 @@ import { googleApiRequest, googleApiRequestAllItems, simplify } from './GenericF
 import { recordFields, recordOperations } from './RecordDescription';
 
 import { v4 as uuid } from 'uuid';
+import { Collection } from 'mongodb';
 
 export class GoogleBigQuery implements INodeType {
 	description: INodeTypeDescription = {
@@ -58,8 +59,7 @@ export class GoogleBigQuery implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
-						// eslint-disable-next-line n8n-nodes-base/node-param-display-name-miscased
-						name: 'OAuth2 (recommended)',
+						name: 'OAuth2 (Recommended)',
 						value: 'oAuth2',
 					},
 					{
@@ -190,21 +190,13 @@ export class GoogleBigQuery implements INodeType {
 						`/v2/projects/${projectId}/datasets/${datasetId}/tables/${tableId}/insertAll`,
 						body,
 					);
-
-					const executionData = this.helpers.constructExecutionMetaData(
-						this.helpers.returnJsonArray(responseData),
-						{ itemData: { item: 0 } },
-					);
-					returnData.push(...executionData);
+					returnData.push(responseData);
 				} catch (error) {
 					if (this.continueOnFail()) {
-						const executionErrorData = this.helpers.constructExecutionMetaData(
-							this.helpers.returnJsonArray({ error: error.message }),
-							{ itemData: { item: 0 } },
-						);
-						returnData.push(...executionErrorData);
+						returnData.push({ json: { error: error.message } });
+					} else {
+						throw new NodeApiError(this.getNode(), error);
 					}
-					throw new NodeApiError(this.getNode(), error, { itemIndex: 0 });
 				}
 			} else if (operation === 'getAll') {
 				// ----------------------------------
@@ -259,10 +251,66 @@ export class GoogleBigQuery implements INodeType {
 							);
 						}
 
-						if (!returnAll) {
-							responseData = responseData.rows;
+						responseData = simple ? simplify(responseData.rows, fields) : responseData.rows;
+
+						const executionData = this.helpers.constructExecutionMetaData(
+							this.helpers.returnJsonArray(responseData),
+							{ itemData: { item: i } },
+						);
+						returnData.push(...executionData);
+					} catch (error) {
+						if (this.continueOnFail()) {
+							const executionErrorData = this.helpers.constructExecutionMetaData(
+								this.helpers.returnJsonArray({ error: error.message }),
+								{ itemData: { item: i } },
+							);
+							returnData.push(...executionErrorData);
+							continue;
 						}
-						responseData = simple ? simplify(responseData, fields) : responseData;
+						throw new NodeApiError(this.getNode(), error, { itemIndex: i });
+					}
+				}
+			} else if (operation === 'query') {
+				// -----------------------------------
+				//         record: query
+				// ----------------------------------
+
+				const fallbackValue = 'Not set';
+
+				const projectId = this.getNodeParameter('projectId', 0) as string;
+				const datasetId = this.getNodeParameter('datasetId', 0, fallbackValue) as string;
+				const tableId = this.getNodeParameter('tableId', 0, fallbackValue) as string;
+				const query = this.getNodeParameter('query', 0) as string;
+				const simple = this.getNodeParameter('simple', 0) as boolean;	
+						
+				let fields;
+
+				if (simple === true) {
+					const { schema } = await googleApiRequest.call(
+						this,
+						'GET',
+						`/v2/projects/${projectId}/datasets/${datasetId}/tables/${tableId}`,
+						{},
+					);
+					fields = schema.fields.map((field: IDataObject) => field.name);
+				}
+
+				for (let i = 0; i < length; i++) {
+					try {
+						const options = this.getNodeParameter('options', i) as IDataObject;
+						const body: IDataObject = {};
+						Object.assign(body, options);
+						body.query = query;
+						body.useLegacySql = false;
+
+						responseData = await googleApiRequest.call(
+							this,
+							'POST',
+							`/v2/projects/${projectId}/queries`,
+							body
+						);
+
+						responseData = simple ? simplify(responseData.rows, fields) : responseData.rows;
 
 						const executionData = this.helpers.constructExecutionMetaData(
 							this.helpers.returnJsonArray(responseData),
